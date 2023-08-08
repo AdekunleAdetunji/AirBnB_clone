@@ -14,7 +14,6 @@ class HBNBCommand(cmd.Cmd):
 
     def do_quit(self, line):
         """implementation of quit"""
-        print()
         return True
 
     def do_EOF(self, line):
