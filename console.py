@@ -12,6 +12,7 @@ from models.city import City
 from models.amenity import Amenity
 from models.place import Place
 from models.review import Review
+import re
 
 
 class HBNBCommand(cmd.Cmd):
@@ -104,6 +105,54 @@ class HBNBCommand(cmd.Cmd):
                 if line in k:
                     result.append(str(v))
             print(result)
+
+    def do_update(self, line):
+        """Updates an instance based on the class name
+        and id by adding or updating attribute"""
+        if not line:
+            print("** class name missing **")
+            return False
+
+        exp = r'^(\S+)(?:\s(\S+)(?:\s(\S+)(?:\s((?:"[^"]*")|(?:\S+)))?)?)?'
+        match = re.search(exp, line)
+        class_name = match.group(1)
+        uuid = match.group(2)
+        attribute = match.group(3)
+        value = match.group(4)
+
+        if not match:
+            print("** class name missing **")
+            return False
+        if class_name not in HBNBCommand.classes:
+            print("** class doesn't exist **")
+        if not uuid:
+            print("** instance id missing **")
+            return False
+        id = ".".join([class_name, uuid])
+        if id not in storage.all():
+            print("** no instance found **")
+        if not attribute:
+            print("** attribute name missing **")
+        if not value:
+            print("** value missing **")
+        obj = storage.all()[id]
+        if hasattr(obj, attribute):
+            v = type(getattr(obj, attribute))
+            try:
+                setattr(obj, attribute, v(value.strip('"')))
+            except ValueError:
+                pass
+        else:
+            if value.startswith('"'):
+                value = value.strip('"')
+            else:
+                number_type = float if "." in value else int
+                try:
+                    value = number_type(value)
+                except ValueError:
+                    pass
+            setattr(obj, attribute, value)
+        obj.save()
 
 
 if __name__ == "__main__":
