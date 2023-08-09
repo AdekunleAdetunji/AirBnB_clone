@@ -222,6 +222,7 @@ class HBNBCommand(cmd.Cmd):
                 print("** no instance found **")
                 return ""
             del storage.all()[id]
+            storage.save()
             return ""
         if command == "update":
             if not args:
