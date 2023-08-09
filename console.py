@@ -4,6 +4,7 @@ This module contains the class that serves as the entry point to the command
 interpreter
 """
 import cmd
+import json
 from models import storage
 from models.base_model import BaseModel
 from models.user import User
@@ -13,6 +14,34 @@ from models.amenity import Amenity
 from models.place import Place
 from models.review import Review
 import re
+
+
+def update_helper(obj, attribute, value):
+    """helper function for update"""
+
+    if not attribute:
+        print("** attribute name missing **")
+        return False
+    if not value:
+        print("** value missing **")
+        return False
+    if hasattr(obj.__class__, attribute):
+        v = type(getattr(obj.__class__, attribute))
+        try:
+            setattr(obj, attribute, v(value.strip('"')))
+        except ValueError:
+            pass
+    else:
+        if value.startswith('"'):
+            value = value.strip('"')
+        else:
+            number_type = float if "." in value else int
+            try:
+                value = number_type(value)
+            except ValueError:
+                pass
+        setattr(obj, attribute, value)
+    obj.save()
 
 
 class HBNBCommand(cmd.Cmd):
@@ -39,6 +68,11 @@ class HBNBCommand(cmd.Cmd):
         """
         print()
         return True
+
+    def emptyline(self):
+        """Define the console behaviour when an empty command is
+        supplied"""
+        pass
 
     def do_create(self, line):
         """creates a new instance of any class and prints the ID"""
@@ -125,34 +159,107 @@ class HBNBCommand(cmd.Cmd):
             return False
         if class_name not in HBNBCommand.classes:
             print("** class doesn't exist **")
+            return False
         if not uuid:
             print("** instance id missing **")
             return False
         id = ".".join([class_name, uuid])
         if id not in storage.all():
             print("** no instance found **")
-        if not attribute:
-            print("** attribute name missing **")
-        if not value:
-            print("** value missing **")
+            return False
         obj = storage.all()[id]
-        if hasattr(obj, attribute):
-            v = type(getattr(obj, attribute))
-            try:
-                setattr(obj, attribute, v(value.strip('"')))
-            except ValueError:
-                pass
-        else:
-            if value.startswith('"'):
-                value = value.strip('"')
-            else:
-                number_type = float if "." in value else int
-                try:
-                    value = number_type(value)
-                except ValueError:
-                    pass
-            setattr(obj, attribute, value)
-        obj.save()
+        return update_helper(obj, attribute, value)
+
+    def precmd(self, line):
+        """Preliminary preparations before executing command"""
+        cmds = ["all", "show", "update", "destroy", "count"]
+        line = line.strip()
+        exp = r'^([A-Z-a-z]+)(?:\.([a-z]+)\((.*)\))?'
+        match = re.search(exp, line)
+        if not match:
+            return line
+        class_name = match.group(1)
+        if class_name not in HBNBCommand.classes:
+            return line
+        command = match.group(2)
+        if command not in cmds:
+            return line
+        args = match.group(3)
+        if command == "all":
+            result = []
+            for k, v in storage.all().items():
+                if class_name in k:
+                    result.append(str(v))
+            print(result)
+            return ""
+        if command == "count":
+            result = 0
+            for k, v in storage.all().items():
+                if class_name in k:
+                    result += 1
+            print(result)
+            return ""
+        if command == "show":
+            if not args:
+                print("** instance id missing **")
+                return ""
+            id = ".".join([class_name, args.strip('"')])
+            obj = storage.all().get(id)
+            if not obj:
+                print("** no instance found **")
+                return ""
+            print(obj)
+            return ""
+        if command == "destroy":
+            if not args:
+                print("** instance id missing **")
+                return ""
+            id = ".".join([class_name, args.strip('"')])
+            if id not in storage.all():
+                print("** no instance found **")
+                return ""
+            del storage.all()[id]
+            return ""
+        if command == "update":
+            if not args:
+                print("** instance id missing **")
+                return ""
+            exp = r'^((?:\"[^"]+\")|(?:[a-z-0-9-\-]+))(?:,\s(.+))?'
+            match = re.search(exp, args)
+            if match:
+                uuid = match.group(1)
+                others = match.group(2)
+                id = ".".join([class_name, uuid])
+                if id not in storage.all():
+                    print("** no instance found **")
+                    return ""
+                obj = storage.all()[id]
+                if not others:
+                    print("** attribute name missing **")
+                    return ""
+
+                exp = r'^(\"[^"]+\")(?:,\s("[^"]+"))?'
+                match = re.search(exp, others)
+                if match:
+                    attribute = match.group(1).strip('"')
+                    value = match.group(2).strip('"')
+                    update_helper(obj, attribute, value)
+                    return ""
+                exp = r'^(\{(?:.+\:.+,?)*\})'
+                match = re.search(exp, others)
+                if match:
+                    dictionary = match.group(1)
+                    if dictionary:
+                        try:
+                            dictionary = dictionary.replace("'", '"')
+                            dictionary = json.loads(dictionary)
+                            for k, v in dictionary.items():
+                                setattr(obj, k, v)
+                            return ""
+                        except Exception:
+                            print("Error")
+                            return line
+        return line
 
 
 if __name__ == "__main__":
