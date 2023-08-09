@@ -58,7 +58,7 @@ class FileStorage:
             with open(FileStorage.__file_path, "r", encoding="utf-8") as file:
                 obj_of_dicts = json.load(file)
                 FileStorage.__objects =\
-                    {key: FileStorage.__classes[val["__class__"]](val)
+                    {key: FileStorage.__classes[val["__class__"]](**val)
                      for key, val in obj_of_dicts.items()}
 
         except Exception:

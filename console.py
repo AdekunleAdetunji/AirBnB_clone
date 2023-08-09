@@ -25,6 +25,8 @@ def update_helper(obj, attribute, value):
     if not value:
         print("** value missing **")
         return False
+    attribute = attribute.strip('"')
+    value = value.strip('"')
     if hasattr(obj.__class__, attribute):
         v = type(getattr(obj.__class__, attribute))
         try:
@@ -174,13 +176,14 @@ class HBNBCommand(cmd.Cmd):
         """Preliminary preparations before executing command"""
         cmds = ["all", "show", "update", "destroy", "count"]
         line = line.strip()
-        exp = r'^([A-Z-a-z]+)(?:\.([a-z]+)\((.*)\))?'
+        exp = r'^([A-Z-a-z]+)(?:\.([a-z]+)\(([^\)]*)\))$'
         match = re.search(exp, line)
         if not match:
             return line
         class_name = match.group(1)
         if class_name not in HBNBCommand.classes:
-            return line
+            print("** class doesn't exist **")
+            return ""
         command = match.group(2)
         if command not in cmds:
             return line
@@ -224,10 +227,10 @@ class HBNBCommand(cmd.Cmd):
             if not args:
                 print("** instance id missing **")
                 return ""
-            exp = r'^((?:\"[^"]+\")|(?:[a-z-0-9-\-]+))(?:,\s(.+))?'
+            exp = r'^(\"[^"]+\")(?:, (.+))?'
             match = re.search(exp, args)
             if match:
-                uuid = match.group(1)
+                uuid = match.group(1).strip('"')
                 others = match.group(2)
                 id = ".".join([class_name, uuid])
                 if id not in storage.all():
@@ -237,12 +240,11 @@ class HBNBCommand(cmd.Cmd):
                 if not others:
                     print("** attribute name missing **")
                     return ""
-
-                exp = r'^(\"[^"]+\")(?:,\s("[^"]+"))?'
+                exp = r'^(\"[^"]+\")(?:, ((?:\"[^"]+\")|(?:\d+)))?'
                 match = re.search(exp, others)
                 if match:
-                    attribute = match.group(1).strip('"')
-                    value = match.group(2).strip('"')
+                    attribute = match.group(1)
+                    value = match.group(2)
                     update_helper(obj, attribute, value)
                     return ""
                 exp = r'^(\{(?:.+\:.+,?)*\})'
@@ -255,6 +257,7 @@ class HBNBCommand(cmd.Cmd):
                             dictionary = json.loads(dictionary)
                             for k, v in dictionary.items():
                                 setattr(obj, k, v)
+                            storage.save()
                             return ""
                         except Exception:
                             print("Error")
